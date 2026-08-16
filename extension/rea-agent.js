@@ -37,6 +37,7 @@
   }
 
   function ensureStyles() {
+    if (!document.head) return; // runs at document_start; head arrives shortly
     if (document.getElementById("wrh-rea-styles")) return;
     const style = document.createElement("style");
     style.id = "wrh-rea-styles";
@@ -117,8 +118,16 @@
         return;
       }
       const id = o.listingId ?? o.id;
-      const pt = o.propertyType;
-      if (id != null && typeof pt === "string") {
+      // propertyType may be a string or an object like
+      // {id: "retirement", display: "Retirement Living"}.
+      const ptRaw = o.propertyType ?? o.propertyTypeDisplay;
+      const pt =
+        typeof ptRaw === "string"
+          ? ptRaw
+          : ptRaw && typeof ptRaw === "object"
+            ? String(ptRaw.display ?? ptRaw.id ?? "")
+            : "";
+      if (id != null && pt) {
         found.push({
           id: String(id),
           propertyType: pt,
@@ -149,6 +158,8 @@
     }
   }
 
+  const API_URL_RE = /lexa|graphql|listing|map|search/i;
+
   const origFetch = window.fetch;
   window.fetch = function (...args) {
     const p = origFetch.apply(this, args);
@@ -156,7 +167,7 @@
       const url = String(
         typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || ""
       );
-      if (/lexa|graphql|listing|map|search/i.test(url)) {
+      if (API_URL_RE.test(url)) {
         p.then((res) => {
           const ct = res.headers.get("content-type") || "";
           if (ct.includes("json")) {
@@ -166,6 +177,31 @@
       }
     } catch (e) {}
     return p;
+  };
+
+  const origXhrOpen = XMLHttpRequest.prototype.open;
+  const origXhrSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    this.__wrhUrl = String(url || "");
+    return origXhrOpen.call(this, method, url, ...rest);
+  };
+  XMLHttpRequest.prototype.send = function (...args) {
+    if (API_URL_RE.test(this.__wrhUrl || "")) {
+      this.addEventListener("load", () => {
+        try {
+          if (this.responseType === "json" && this.response) {
+            harvest(this.response);
+          } else if (
+            (this.responseType === "" || this.responseType === "text") &&
+            typeof this.responseText === "string" &&
+            this.responseText.startsWith("{")
+          ) {
+            harvest(JSON.parse(this.responseText));
+          }
+        } catch (e) {}
+      });
+    }
+    return origXhrSend.apply(this, args);
   };
 
   let scanTimer = null;
