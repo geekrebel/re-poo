@@ -160,14 +160,21 @@
     if (!hasLocalStorageArea) return;
     clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
-      let entries = [...deepCache.entries()];
-      if (entries.length > 2000) {
-        entries.sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
-        entries = entries.slice(0, 2000);
-        deepCache.clear();
-        for (const [k, v] of entries) deepCache.set(k, v);
-      }
-      chrome.storage.local.set({ deepScanCache: Object.fromEntries(deepCache) });
+      // Merge with storage rather than overwrite (same multi-tab race as the
+      // registry): adopt entries other tabs cached, then write the union.
+      chrome.storage.local.get({ deepScanCache: {} }, (res) => {
+        for (const [id, v] of Object.entries(res.deepScanCache || {})) {
+          if (!deepCache.has(id)) deepCache.set(id, v);
+        }
+        let entries = [...deepCache.entries()];
+        if (entries.length > 2000) {
+          entries.sort((a, b) => (b[1].t || 0) - (a[1].t || 0));
+          entries = entries.slice(0, 2000);
+          deepCache.clear();
+          for (const [k, v] of entries) deepCache.set(k, v);
+        }
+        chrome.storage.local.set({ deepScanCache: Object.fromEntries(deepCache) });
+      });
     }, 1000);
   }
 
@@ -286,9 +293,26 @@
     if (!hasLocalStorageArea) return;
     clearTimeout(registryTimer);
     registryTimer = setTimeout(() => {
-      chrome.storage.local.set({
-        villageBases: [...savedBases].slice(-800),
-        villagePts: savedPts.slice(-3000)
+      // Merge with storage rather than overwrite: tabs on both sites write
+      // concurrently, and last-writer-wins was observed wiping villages that
+      // other tabs had learned.
+      chrome.storage.local.get({ villageBases: [], villagePts: [] }, (res) => {
+        for (const b of res.villageBases || []) savedBases.add(b);
+        for (const p of res.villagePts || []) {
+          if (
+            Array.isArray(p) &&
+            typeof p[0] === "number" &&
+            typeof p[1] === "number" &&
+            !savedPtKeys.has(ptKey(p))
+          ) {
+            savedPtKeys.add(ptKey(p));
+            savedPts.push(p);
+          }
+        }
+        chrome.storage.local.set({
+          villageBases: [...savedBases].slice(-800),
+          villagePts: savedPts.slice(-3000)
+        });
       });
     }, 1000);
   }
