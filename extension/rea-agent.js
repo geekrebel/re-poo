@@ -1,11 +1,13 @@
 // RE-Poo — realestate.com.au map agent (experimental).
-// Runs in the page's MAIN world. REA map markers carry lat/lng and the
-// listing id in their DOM ids (BuyMapIndividual_<lat>_<lng>_<id>), so pins
-// can be marked straight from the shared village registry — villages learned
-// while browsing Domain flag REA pins with no data fetching at all.
-// Additionally, JSON responses from REA's own data APIs are observed via a
-// fetch wrapper to learn REA-side retirement listings, which content.js
-// folds back into the registry.
+// Runs in the page's MAIN world at document_idle. REA map markers carry
+// lat/lng and the listing id in their DOM ids (BuyMapIndividual_<lat>_<lng>_
+// <id>), so pins for known villages are marked straight from the shared
+// registry the moment the map renders — no data access needed. Listing
+// metadata is harvested opportunistically from REA's lexa GraphQL responses
+// (fetch/XHR observers) as the user pans and zooms; the page-load mexa call
+// is not interceptable usefully (it 401s / retries out of reach), which is
+// why the observers deliberately install late — after Kasada has settled —
+// rather than at document_start.
 (function () {
   let rules = null; // includes registry points (pts) from content.js
   let flaggedIds = new Set();
