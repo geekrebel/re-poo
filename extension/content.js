@@ -355,11 +355,17 @@
     }
   }
 
-  // One fetch at a time, well spaced: a burst of ~100 fetches gets 403
-  // bot-challenged by Domain. On repeated failures, back off and retry later
-  // (failures are requeued, never cached).
-  const DEEP_DELAY_MS = 1200;
-  const DEEP_BACKOFF_MS = 3 * 60 * 1000;
+  // Politeness rules, learned the hard way (Akamai blocks the whole browsing
+  // session, not just the extension):
+  // - One fetch at a time ACROSS ALL TABS (Web Locks are shared per origin,
+  //   so the named lock serialises every Domain tab's scanner).
+  // - ~3-4.5s between fetches with jitter (max ~15-20/min total).
+  // - Only the visible tab scans; background tabs wait.
+  // - On repeated failures, back off for 10 minutes; failures are requeued,
+  //   never cached.
+  const DEEP_DELAY_MS = 3000;
+  const DEEP_JITTER_MS = 1500;
+  const DEEP_BACKOFF_MS = 10 * 60 * 1000;
   let deepPausedUntil = 0;
   let deepFailStreak = 0;
 
@@ -372,22 +378,26 @@
   }
 
   function pumpDeepQueue() {
+    if (deepActive >= 1 || !deepQueue.length) return;
+    if (document.hidden) return; // resumes on visibilitychange
     const now = Date.now();
     if (now < deepPausedUntil) {
       setTimeout(pumpDeepQueue, deepPausedUntil - now + 100);
       return;
     }
-    while (deepActive < 1 && deepQueue.length) {
-      const { id, url } = deepQueue.shift();
-      if (deepCache.has(String(id))) continue;
-      deepActive++;
-      fetch(url, { credentials: "same-origin" })
-        .then((r) => (r.ok ? r.text() : null))
-        .then((html) => {
-          if (html === null || html.indexOf('id="__NEXT_DATA__"') === -1) {
-            deepFetchFailed(id, url); // rate limited or bot-challenged
-            return;
-          }
+    const { id, url } = deepQueue.shift();
+    if (deepCache.has(String(id))) {
+      pumpDeepQueue();
+      return;
+    }
+    deepActive++;
+    const run = async () => {
+      try {
+        const r = await fetch(url, { credentials: "same-origin" });
+        const html = r.ok ? await r.text() : null;
+        if (html === null || html.indexOf('id="__NEXT_DATA__"') === -1) {
+          deepFetchFailed(id, url); // rate limited or bot-challenged
+        } else {
           deepFailStreak = 0;
           deepCache.set(String(id), { t: Date.now(), txt: extractListingText(html) });
           persistDeepCache();
@@ -398,16 +408,29 @@
             updatePill();
             broadcastDeepIds();
           }
-        })
-        .catch(() => {
-          deepFetchFailed(id, url);
-        })
-        .finally(() => {
-          deepActive--;
-          setTimeout(pumpDeepQueue, DEEP_DELAY_MS);
-        });
-    }
+        }
+      } catch (e) {
+        deepFetchFailed(id, url);
+      }
+      // Hold the cross-tab lock through the cooldown so the global rate
+      // stays capped no matter how many tabs are open.
+      await new Promise((resolve) =>
+        setTimeout(resolve, DEEP_DELAY_MS + Math.random() * DEEP_JITTER_MS)
+      );
+    };
+    const locked =
+      navigator.locks && navigator.locks.request
+        ? navigator.locks.request("wrh-deep-fetch", run)
+        : run();
+    Promise.resolve(locked).finally(() => {
+      deepActive--;
+      pumpDeepQueue();
+    });
   }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pumpDeepQueue();
+  });
 
   function queueDeepScans() {
     if (!settings.deepScan) return;

@@ -7,7 +7,7 @@ Everything below is copy-paste ready for the Developer Dashboard
 
 ## Package
 
-Upload: `re-poo-v2.0.zip` (in this folder).
+Upload: `re-poo-v2.0.1.zip` (in this folder).
 
 ---
 
@@ -100,7 +100,7 @@ data is collected, but it removes reviewer friction.
 1. Go to https://chrome.google.com/webstore/devconsole and sign in with the
    Google account you want to own the extension.
 2. Pay the one-time US$5 developer registration fee.
-3. "New item" → upload `re-poo-v2.0.zip`.
+3. "New item" → upload `re-poo-v2.0.1.zip`.
 4. Fill the Store Listing tab (copy from above), upload icon/screenshots.
    The 128px icon inside the package is used automatically.
 5. Fill the Privacy tab (copy from above).
