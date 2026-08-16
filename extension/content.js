@@ -654,8 +654,11 @@
       event.data.type === "wrh-rea-listings" &&
       Array.isArray(event.data.listings)
     ) {
-      // REA API records observed by rea-agent.js. Flag retirement-ish ones
-      // and fold their coordinates into the shared village registry.
+      // REA API records observed by rea-agent.js. Flag retirement-ish ones —
+      // by property type/text, by user keyword, or by a base address already
+      // burned in the registry (REA types Pine Needles units as plain
+      // "House"/"Villa", but their addresses still say 61 Karalta Road) —
+      // and fold their addresses and coordinates back into the registry.
       const re =
         /retirement|over\s*-?\s*5[05]|land\s*lease|lifestyle\s+(?:village|community|resort|estate)|rental\s+village/i;
       const keywords = cleanKeywords();
@@ -663,15 +666,35 @@
       for (const item of event.data.listings) {
         if (!item || item.id == null) continue;
         const hay =
-          String(item.propertyType || "") + " " + String(item.text || "");
+          String(item.propertyType || "") +
+          " " +
+          String(item.text || "") +
+          " " +
+          String(item.street || "");
         const kwHit = keywords.some((k) =>
           hay.toLowerCase().includes(k.toLowerCase())
         );
-        if (!settings.hideRetirement && !kwHit) continue;
-        if (!re.test(hay) && !kwHit) continue;
+        const info = baseAddressKey({
+          address: {
+            street: String(item.street || ""),
+            suburb: String(item.suburb || "")
+          }
+        });
+        const contentHit =
+          (settings.hideRetirement && re.test(hay)) || kwHit;
+        const baseHit =
+          settings.hideRetirement && info && savedBases.has(info.key);
+        if (!contentHit && !baseHit) continue;
         const id = String(item.id);
         if (!reaFlaggedIds.has(id)) {
           reaFlaggedIds.add(id);
+          changed = true;
+        }
+        // Strong (content) hits teach the registry their base address, so
+        // future plain-typed siblings match by address on either site.
+        if (contentHit && info && !savedBases.has(info.key)) {
+          savedBases.add(info.key);
+          persistRegistry();
           changed = true;
         }
         if (typeof item.lat === "number" && typeof item.lng === "number") {

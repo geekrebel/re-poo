@@ -128,9 +128,22 @@
             ? String(ptRaw.display ?? ptRaw.id ?? "")
             : "";
       if (id != null && pt) {
+        const addr = o.address;
         found.push({
           id: String(id),
           propertyType: pt,
+          street:
+            typeof addr === "string"
+              ? addr
+              : (addr &&
+                  (addr.streetAddress ||
+                    (addr.display &&
+                      (addr.display.shortAddress || addr.display.fullAddress)))) ||
+                "",
+          suburb:
+            (addr && typeof addr === "object" && (addr.suburb || addr.locality)) ||
+            o.suburb ||
+            "",
           text: [o.name, o.title, o.headline, o.description]
             .filter((x) => typeof x === "string")
             .join(" ")
