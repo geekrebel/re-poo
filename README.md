@@ -12,7 +12,11 @@ you're over 50.
 
 - **Hides retirement/land-lease listings** on domain.com.au search results —
   including ones typed as "House" with nothing on the card to warn you.
-- **Marks their map pins** blood red, or with a 💩 emoji (configurable).
+- **Marks their map pins** blood red, or with a 💩 emoji (configurable) — on
+  domain.com.au **and** realestate.com.au. Bundled REA pins keep their count
+  ("💩33" = a 33-listing park).
+- **Cross-site village registry**: villages learned while browsing one site
+  flag pins on the other, live, and are remembered forever.
 - **Shows a counter** of hidden listings; click it to peek at what was
   filtered, dimmed and outlined, so nothing genuine is lost.
 - **Custom exclusion keywords** for anything else you never want to see.
@@ -61,8 +65,14 @@ folder. Sideloaded installs don't auto-update — re-download for new versions.
 
 ## Caveats
 
-- Tuned for domain.com.au; realestate.com.au has basic keyword/rent support
-  only. Domain markup changes may break the structured-data layers — the
+- Domain markup changes may break the structured-data layers — the
   visible-text matching remains as a fallback.
+- On realestate.com.au, the first visit to an uncharted area may need one
+  pan/zoom before pins mark (the page-load data API isn't observable; the
+  pan/zoom traffic is). Once an area's villages are learned they mark
+  instantly, forever, on both sites.
+- realestate.com.au list pages get keyword/rent support only (map view is
+  the fully supported surface).
 - Detection heuristics can false-positive (e.g. a genuine gated estate);
-  the peek pill exists so you can audit what was hidden.
+  the peek pill exists so you can audit what was hidden, and marked pins
+  are visible rather than removed.
