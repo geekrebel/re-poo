@@ -331,9 +331,14 @@
     }
   }
 
+  const reaFlaggedIds = new Set(); // learned from REA's own API responses
+
   function broadcastDeepIds() {
     window.postMessage(
-      { type: "wrh-deep-ids", ids: [...deepFlaggedIds, ...clusterFlaggedIds] },
+      {
+        type: "wrh-deep-ids",
+        ids: [...deepFlaggedIds, ...clusterFlaggedIds, ...reaFlaggedIds]
+      },
       window.location.origin
     );
   }
@@ -604,7 +609,10 @@
           colorMapPins: settings.colorMapPins,
           pinStyle: settings.pinStyle,
           hideRetirement: settings.hideRetirement,
-          keywords: cleanKeywords()
+          keywords: cleanKeywords(),
+          // Registry coordinates let the REA agent mark pins purely by
+          // proximity to villages learned on Domain (and vice versa).
+          pts: savedPts.slice(-500)
         }
       },
       window.location.origin
@@ -641,6 +649,44 @@
         updatePill();
         broadcastDeepIds();
         queueDeepScans();
+      }
+    } else if (
+      event.data.type === "wrh-rea-listings" &&
+      Array.isArray(event.data.listings)
+    ) {
+      // REA API records observed by rea-agent.js. Flag retirement-ish ones
+      // and fold their coordinates into the shared village registry.
+      const re =
+        /retirement|over\s*-?\s*5[05]|land\s*lease|lifestyle\s+(?:village|community|resort|estate)|rental\s+village/i;
+      const keywords = cleanKeywords();
+      let changed = false;
+      for (const item of event.data.listings) {
+        if (!item || item.id == null) continue;
+        const hay =
+          String(item.propertyType || "") + " " + String(item.text || "");
+        const kwHit = keywords.some((k) =>
+          hay.toLowerCase().includes(k.toLowerCase())
+        );
+        if (!settings.hideRetirement && !kwHit) continue;
+        if (!re.test(hay) && !kwHit) continue;
+        const id = String(item.id);
+        if (!reaFlaggedIds.has(id)) {
+          reaFlaggedIds.add(id);
+          changed = true;
+        }
+        if (typeof item.lat === "number" && typeof item.lng === "number") {
+          const p = [item.lat, item.lng];
+          if (!savedPtKeys.has(ptKey(p))) {
+            savedPtKeys.add(ptKey(p));
+            savedPts.push(p);
+            persistRegistry();
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        broadcastDeepIds();
+        broadcastRules(); // refresh the agent's registry points
       }
     }
   });

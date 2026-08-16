@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RE-Poo",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Fixes real estate search results: hide Retirement Living and other unwanted listings, show monthly prices next to weekly rents.",
   "permissions": [
     "storage"
@@ -31,6 +31,16 @@
       ],
       "js": [
         "map-agent.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.realestate.com.au/*"
+      ],
+      "js": [
+        "rea-agent.js"
       ],
       "run_at": "document_idle",
       "world": "MAIN"
