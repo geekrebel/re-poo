@@ -11,7 +11,11 @@
   let flaggedIds = new Set();
 
   const GEO_RADIUS_M = 175;
-  const GEO_MIN_VOTES = 2;
+  // One vote suffices here (vs two for card hiding): Domain gives every unit
+  // in a park the same coordinates, so a whole village can dedupe to a single
+  // registry point — and a wrongly-marked pin is visible and harmless in a
+  // way a wrongly-hidden card is not.
+  const GEO_MIN_VOTES = 1;
 
   function nearRegistry(lat, lng) {
     if (!rules || !Array.isArray(rules.pts) || rules.pts.length < GEO_MIN_VOTES) {
@@ -47,6 +51,11 @@
         align-items: center; justify-content: center;
         font-size: 18px; visibility: visible; pointer-events: none;
       }
+      button.wrh-rea-poop span.wrh-poop-pin.wrh-has-count {
+        font-size: 13px; font-weight: 700; color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+      }
+      button.wrh-rea-flagged span { color: #fff !important; }
     `;
     document.head.appendChild(style);
   }
@@ -57,12 +66,18 @@
     btn.classList.toggle("wrh-rea-poop", flagged && poop);
     let s = btn.querySelector("span.wrh-poop-pin");
     if (flagged && poop) {
+      // Cluster pins carry a bundled-listing count — keep it visible
+      // ("💩33"), it's useful intel about how big the park is.
+      const countEl = btn.querySelector("div span:not(.wrh-poop-pin)");
+      const count = countEl ? countEl.textContent.trim() : "";
+      const label = count ? "\u{1F4A9}" + count : "\u{1F4A9}";
       if (!s) {
         s = document.createElement("span");
         s.className = "wrh-poop-pin";
-        s.textContent = "\u{1F4A9}";
         btn.appendChild(s);
       }
+      if (s.textContent !== label) s.textContent = label;
+      s.classList.toggle("wrh-has-count", !!count);
     } else if (s) {
       s.remove();
     }
