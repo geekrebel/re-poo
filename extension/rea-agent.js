@@ -10,11 +10,12 @@
   let rules = null; // includes registry points (pts) from content.js
   let flaggedIds = new Set();
 
-  const GEO_RADIUS_M = 175;
-  // One vote suffices here (vs two for card hiding): Domain gives every unit
-  // in a park the same coordinates, so a whole village can dedupe to a single
-  // registry point — and a wrongly-marked pin is visible and harmless in a
-  // way a wrongly-hidden card is not.
+  // Wider than Domain's 175m: REA and Domain geocode the same park a couple
+  // of hundred metres apart (observed: 236m for 33 Karalta Rd), so cross-site
+  // matching needs slack. One vote suffices (vs two for card hiding) — a
+  // wrongly-marked pin is visible and harmless in a way a wrongly-hidden
+  // card is not.
+  const GEO_RADIUS_M = 250;
   const GEO_MIN_VOTES = 1;
 
   function nearRegistry(lat, lng) {

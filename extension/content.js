@@ -761,6 +761,41 @@
       start();
     });
     chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local") {
+        // Registry updates from other tabs — e.g. a Domain tab learning a
+        // village should light up an already-open REA tab, and vice versa.
+        let touched = false;
+        if (changes.villagePts) {
+          for (const p of changes.villagePts.newValue || []) {
+            if (
+              Array.isArray(p) &&
+              typeof p[0] === "number" &&
+              typeof p[1] === "number" &&
+              !savedPtKeys.has(ptKey(p))
+            ) {
+              savedPtKeys.add(ptKey(p));
+              savedPts.push(p);
+              touched = true;
+            }
+          }
+        }
+        if (changes.villageBases) {
+          for (const b of changes.villageBases.newValue || []) {
+            if (!savedBases.has(b)) {
+              savedBases.add(b);
+              touched = true;
+            }
+          }
+        }
+        if (touched) {
+          recomputeClusters();
+          hideFlaggedIds();
+          updatePill();
+          broadcastDeepIds();
+          broadcastRules();
+        }
+        return;
+      }
       if (area !== "sync") return;
       for (const [key, change] of Object.entries(changes)) {
         if (key in settings) settings[key] = change.newValue;
