@@ -164,6 +164,7 @@
       for (const v of Object.values(o)) walk(v, depth + 1);
     })(json, 0);
     if (found.length) sendHarvest(found.slice(0, 500));
+    return found.length;
   }
 
   // The agent runs at document_start but content.js only listens from
@@ -182,9 +183,17 @@
     flushedAt: null,
     rulesAt: null,
     ptsCount: 0,
-    flaggedIdCount: 0
+    flaggedIdCount: 0,
+    reqs: [] // last 30 intercepted requests: {t, u, json, found}
   };
   window.__wrhReaDebug = dbg;
+
+  function trackReq(type, url) {
+    const rec = { t: type, u: String(url).slice(0, 140), json: false, found: 0 };
+    dbg.reqs.push(rec);
+    if (dbg.reqs.length > 30) dbg.reqs.shift();
+    return rec;
+  }
 
   function sendHarvest(listings) {
     dbg.harvested += listings.length;
@@ -213,10 +222,18 @@
       );
       if (API_URL_RE.test(url)) {
         dbg.fetchSeen++;
+        const rec = trackReq("fetch", url);
         p.then((res) => {
           const ct = res.headers.get("content-type") || "";
           if (ct.includes("json")) {
-            res.clone().json().then(harvest).catch(() => {});
+            rec.json = true;
+            res
+              .clone()
+              .json()
+              .then((j) => {
+                rec.found = harvest(j);
+              })
+              .catch(() => {});
           }
         }).catch(() => {});
       }
@@ -233,18 +250,25 @@
   XMLHttpRequest.prototype.send = function (...args) {
     if (API_URL_RE.test(this.__wrhUrl || "")) {
       dbg.xhrSeen++;
+      const rec = trackReq("xhr", this.__wrhUrl);
       this.addEventListener("load", () => {
         try {
           if (this.responseType === "json" && this.response) {
-            harvest(this.response);
+            rec.json = true;
+            rec.found = harvest(this.response);
           } else if (
             (this.responseType === "" || this.responseType === "text") &&
             typeof this.responseText === "string" &&
-            this.responseText.startsWith("{")
+            (this.responseText.startsWith("{") || this.responseText.startsWith("["))
           ) {
-            harvest(JSON.parse(this.responseText));
+            rec.json = true;
+            rec.found = harvest(JSON.parse(this.responseText));
+          } else {
+            rec.json = "skipped:" + (this.responseType || "text-nonjson");
           }
-        } catch (e) {}
+        } catch (e) {
+          rec.json = "error";
+        }
       });
     }
     return origXhrSend.apply(this, args);
