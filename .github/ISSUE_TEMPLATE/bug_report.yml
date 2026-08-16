@@ -1,0 +1,28 @@
+name: Bug report
+description: Something broke (not a missed village — use the Village report for those)
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Page URL where it happened
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors / debug output
+      description: |
+        DevTools console errors, plus `copy(JSON.stringify(window.__wrhReaDebug))` on REA map pages.
+        Also check chrome://extensions → RE-Poo → Errors.
+  - type: input
+    id: version
+    attributes:
+      label: RE-Poo version
+      placeholder: e.g. 2.1.0 (from chrome://extensions)

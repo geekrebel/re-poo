@@ -1,0 +1,10 @@
+name: Feature request
+description: An idea to make RE-Poo better
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should RE-Poo do, and why?
+    validations:
+      required: true

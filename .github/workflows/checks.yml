@@ -1,0 +1,29 @@
+name: checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check extension scripts
+        run: |
+          for f in extension/*.js; do node --check "$f"; done
+      - name: Validate manifest
+        run: |
+          python3 - <<'EOF'
+          import json
+          m = json.load(open("extension/manifest.json"))
+          assert m["manifest_version"] == 3
+          assert m["name"] and m["version"]
+          print("manifest ok:", m["name"], m["version"])
+          EOF
+      - name: Build installable package
+        run: cd extension && zip -r ../re-poo-dev.zip . -x "*.DS_Store"
+      - name: Attach package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: re-poo-extension
+          path: re-poo-dev.zip

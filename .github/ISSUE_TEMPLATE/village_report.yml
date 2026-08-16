@@ -1,0 +1,42 @@
+name: "\U0001F4A9 Village report — a sneaky listing escaped"
+description: A retirement/land-lease listing that RE-Poo didn't catch
+title: "[village] "
+labels: ["village-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These reports are how RE-Poo's detection improves — thank you!
+  - type: input
+    id: url
+    attributes:
+      label: Listing URL
+      placeholder: https://www.domain.com.au/... or https://www.realestate.com.au/...
+    validations:
+      required: true
+  - type: dropdown
+    id: site
+    attributes:
+      label: Site
+      options: [domain.com.au, realestate.com.au]
+    validations:
+      required: true
+  - type: input
+    id: village
+    attributes:
+      label: Village/park name (if you know it)
+      placeholder: e.g. Pine Needles, Tarragal Glen
+  - type: textarea
+    id: disguise
+    attributes:
+      label: What does the listing claim to be?
+      description: Property type shown, and anything in the text that gives it away (or doesn't)
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: "Console dump (optional but speeds things up a lot)"
+      description: |
+        On a REA map page: run `copy(JSON.stringify(window.__wrhReaDebug))` in DevTools and paste the result.
+        On Domain: mention whether the listing's card was hidden and the pin's colour.

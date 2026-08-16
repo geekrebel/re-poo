@@ -63,6 +63,14 @@ folder. Sideloaded installs don't auto-update — re-download for new versions.
 - [`store/`](store/) — Chrome Web Store submission kit: listing copy,
   privacy policy, promo tile, upload ZIP
 
+## Contributing
+
+RE-Poo is MIT-licensed — do with it as you please. Contributions welcome,
+from code to simply reporting a sneaky listing that escaped detection (open
+a **💩 Village report** issue — no coding required). See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the one-minute architecture tour and
+the hard-won rules about not getting blocked by real-estate sites.
+
 ## Caveats
 
 - Domain markup changes may break the structured-data layers — the
