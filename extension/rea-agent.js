@@ -195,6 +195,17 @@
     return rec;
   }
 
+  // Debug: keep a snippet of REA-host JSON responses the walker found no
+  // records in, so unknown schemas (mexa) can be adapted.
+  dbg.samples = [];
+  function sampleMiss(rec, json) {
+    if (rec.found === 0 && /realestate\.com\.au/.test(rec.u) && dbg.samples.length < 3) {
+      try {
+        dbg.samples.push({ u: rec.u, body: JSON.stringify(json).slice(0, 3000) });
+      } catch (e) {}
+    }
+  }
+
   function sendHarvest(listings) {
     dbg.harvested += listings.length;
     if (!contentReady) {
@@ -232,6 +243,7 @@
               .json()
               .then((j) => {
                 rec.found = harvest(j);
+                sampleMiss(rec, j);
               })
               .catch(() => {});
           }
@@ -256,13 +268,16 @@
           if (this.responseType === "json" && this.response) {
             rec.json = true;
             rec.found = harvest(this.response);
+            sampleMiss(rec, this.response);
           } else if (
             (this.responseType === "" || this.responseType === "text") &&
             typeof this.responseText === "string" &&
             (this.responseText.startsWith("{") || this.responseText.startsWith("["))
           ) {
             rec.json = true;
-            rec.found = harvest(JSON.parse(this.responseText));
+            const parsed = JSON.parse(this.responseText);
+            rec.found = harvest(parsed);
+            sampleMiss(rec, parsed);
           } else {
             rec.json = "skipped:" + (this.responseType || "text-nonjson");
           }
