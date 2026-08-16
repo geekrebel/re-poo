@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 13px/1.4 system-ui, sans-serif; width: 270px; margin: 0; padding: 14px; color: #222; }
+  h1 { font-size: 14px; margin: 0 0 12px; }
+  label.toggle { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; cursor: pointer; }
+  label.toggle input { margin-top: 1px; }
+  .keywords-label { display: block; margin: 12px 0 4px; font-weight: 600; }
+  textarea { width: 100%; box-sizing: border-box; height: 66px; font: inherit; padding: 6px; }
+  .hint { color: #666; font-size: 11px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+  <h1>RE-Poo <span style="font-weight:400;color:#666;font-size:12px">Real Estate Search Helper</span></h1>
+
+  <label class="toggle">
+    <input type="checkbox" id="hideRetirement">
+    <span>Hide &ldquo;Retirement Living&rdquo; listings</span>
+  </label>
+
+  <label class="toggle">
+    <input type="checkbox" id="colorMapPins">
+    <span>Mark map pins for excluded listings (Domain)</span>
+  </label>
+
+  <label class="toggle" style="margin-left:22px">
+    <span>Pin style:</span>
+    <select id="pinStyle">
+      <option value="red">Blood red</option>
+      <option value="poop">💩 Poop emoji</option>
+    </select>
+  </label>
+
+  <label class="toggle">
+    <input type="checkbox" id="deepScan">
+    <span>Deep scan: read listing descriptions to catch over-55 / land-lease villages disguised as Houses (Domain)</span>
+  </label>
+
+  <label class="toggle">
+    <input type="checkbox" id="showMonthly">
+    <span>Show monthly price next to weekly rent</span>
+  </label>
+
+  <label class="keywords-label" for="extraKeywords">Also hide listings containing:</label>
+  <textarea id="extraKeywords" placeholder="one phrase per line, e.g.
+over 55
+land lease
+retirement village"></textarea>
+
+  <p class="hint">Changes apply immediately to open tabs. When listings are hidden, a green counter appears at the bottom-right of the page &mdash; click it to peek at what was filtered out.</p>
+
+  <script src="popup.js"></script>
+</body>
+</html>
