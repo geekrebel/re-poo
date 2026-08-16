@@ -7,6 +7,7 @@
   let rules = null;
   let lastSent = "";
   let deepIds = new Set(); // deep-scan-flagged listing ids from content.js
+  const sentListingIds = new Set(); // listing data already streamed to content.js
 
   function ensureStyles() {
     if (document.getElementById("wrh-map-styles")) return;
@@ -94,9 +95,19 @@
     if (!rules) return;
     ensureStyles();
     const flaggedIds = [];
+    // Listings that arrive from map panning never appear in the page's
+    // __NEXT_DATA__, so their data is streamed to content.js from the
+    // markers themselves for deep-scanning and clustering.
+    const newListings = [];
     for (const svg of document.querySelectorAll("svg.listing-marker")) {
       const listings = markerListings(svg);
       if (!listings) continue;
+      for (const l of listings) {
+        if (l && l.id != null && l.listingModel && !sentListingIds.has(String(l.id))) {
+          sentListingIds.add(String(l.id));
+          newListings.push({ id: String(l.id), listingModel: l.listingModel });
+        }
+      }
       const bad = listings.filter(listingFlagged);
       const deepHit = listings.some((l) => l && l.id != null && deepIds.has(String(l.id)));
       // Colouring is a separate toggle, but flagged ids are always reported
@@ -116,6 +127,12 @@
           window.location.origin
         );
       }
+    }
+    if (newListings.length) {
+      window.postMessage(
+        { type: "wrh-marker-listings", listings: newListings },
+        window.location.origin
+      );
     }
   }
 
@@ -144,6 +161,9 @@
     if (event.data.type === "wrh-rules" && event.data.rules) {
       rules = event.data.rules;
       lastSent = "";
+      // content.js rebuilds its listing map on settings changes — re-stream
+      // everything so panned-in listings aren't lost.
+      sentListingIds.clear();
       scan();
     } else if (event.data.type === "wrh-deep-ids" && Array.isArray(event.data.ids)) {
       deepIds = new Set(event.data.ids.map(String));

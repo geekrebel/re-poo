@@ -597,6 +597,28 @@
       for (const id of event.data.ids) markerFlaggedIds.add(String(id));
       hideFlaggedIds();
       updatePill();
+    } else if (
+      event.data.type === "wrh-marker-listings" &&
+      Array.isArray(event.data.listings)
+    ) {
+      // Listings discovered by map panning — merge them so the deep scan and
+      // clustering cover them too (the page's __NEXT_DATA__ never updates).
+      let changed = false;
+      for (const item of event.data.listings) {
+        if (!item || item.id == null || typeof item.listingModel !== "object") continue;
+        const id = String(item.id);
+        if (id in lastListingsMap) continue;
+        lastListingsMap[id] = { listingModel: item.listingModel };
+        if (listingModelFlagged(item.listingModel)) dataFlaggedIds.add(id);
+        changed = true;
+      }
+      if (changed) {
+        recomputeClusters();
+        hideFlaggedIds();
+        updatePill();
+        broadcastDeepIds();
+        queueDeepScans();
+      }
     }
   });
 
