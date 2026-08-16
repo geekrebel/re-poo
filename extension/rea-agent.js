@@ -173,9 +173,24 @@
   let contentReady = false;
   let pendingHarvest = [];
 
+  // Diagnostics, readable from the page console as window.__wrhReaDebug.
+  const dbg = {
+    fetchSeen: 0,
+    xhrSeen: 0,
+    harvested: 0,
+    buffered: 0,
+    flushedAt: null,
+    rulesAt: null,
+    ptsCount: 0,
+    flaggedIdCount: 0
+  };
+  window.__wrhReaDebug = dbg;
+
   function sendHarvest(listings) {
+    dbg.harvested += listings.length;
     if (!contentReady) {
       pendingHarvest.push(...listings);
+      dbg.buffered = pendingHarvest.length;
       if (pendingHarvest.length > 2000) {
         pendingHarvest = pendingHarvest.slice(-2000);
       }
@@ -197,6 +212,7 @@
         typeof args[0] === "string" ? args[0] : (args[0] && args[0].url) || ""
       );
       if (API_URL_RE.test(url)) {
+        dbg.fetchSeen++;
         p.then((res) => {
           const ct = res.headers.get("content-type") || "";
           if (ct.includes("json")) {
@@ -216,6 +232,7 @@
   };
   XMLHttpRequest.prototype.send = function (...args) {
     if (API_URL_RE.test(this.__wrhUrl || "")) {
+      dbg.xhrSeen++;
       this.addEventListener("load", () => {
         try {
           if (this.responseType === "json" && this.response) {
@@ -254,15 +271,20 @@
     if (event.source !== window || !event.data || typeof event.data !== "object") return;
     if (event.data.type === "wrh-rules" && event.data.rules) {
       rules = event.data.rules;
+      dbg.rulesAt = Date.now();
+      dbg.ptsCount = Array.isArray(rules.pts) ? rules.pts.length : 0;
       if (!contentReady) {
         contentReady = true;
         if (pendingHarvest.length) {
+          dbg.flushedAt = Date.now();
           sendHarvest(pendingHarvest.splice(0, pendingHarvest.length));
+          dbg.buffered = 0;
         }
       }
       scan();
     } else if (event.data.type === "wrh-deep-ids" && Array.isArray(event.data.ids)) {
       flaggedIds = new Set(event.data.ids.map(String));
+      dbg.flaggedIdCount = flaggedIds.size;
       scan();
     }
   });

@@ -142,6 +142,17 @@
   const hasLocalStorageArea =
     hasExtensionStorage && !!chrome.storage.local;
 
+  // After the extension is reloaded, this instance is orphaned: chrome.*
+  // calls throw "Extension context invalidated". Timers may still fire, so
+  // every deferred storage touch checks liveness first.
+  function extAlive() {
+    try {
+      return !!(chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+      return false;
+    }
+  }
+
   function loadDeepCache(done) {
     if (!hasLocalStorageArea) {
       done();
@@ -160,6 +171,7 @@
     if (!hasLocalStorageArea) return;
     clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
+      if (!extAlive()) return;
       // Merge with storage rather than overwrite (same multi-tab race as the
       // registry): adopt entries other tabs cached, then write the union.
       chrome.storage.local.get({ deepScanCache: {} }, (res) => {
@@ -293,6 +305,7 @@
     if (!hasLocalStorageArea) return;
     clearTimeout(registryTimer);
     registryTimer = setTimeout(() => {
+      if (!extAlive()) return;
       // Merge with storage rather than overwrite: tabs on both sites write
       // concurrently, and last-writer-wins was observed wiping villages that
       // other tabs had learned.
