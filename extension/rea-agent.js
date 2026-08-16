@@ -163,12 +163,28 @@
       }
       for (const v of Object.values(o)) walk(v, depth + 1);
     })(json, 0);
-    if (found.length) {
-      window.postMessage(
-        { type: "wrh-rea-listings", listings: found.slice(0, 500) },
-        window.location.origin
-      );
+    if (found.length) sendHarvest(found.slice(0, 500));
+  }
+
+  // The agent runs at document_start but content.js only listens from
+  // document_idle — postMessage is fire-and-forget, so harvests from the
+  // page-load API responses must be buffered until the rules handshake
+  // proves content.js is awake.
+  let contentReady = false;
+  let pendingHarvest = [];
+
+  function sendHarvest(listings) {
+    if (!contentReady) {
+      pendingHarvest.push(...listings);
+      if (pendingHarvest.length > 2000) {
+        pendingHarvest = pendingHarvest.slice(-2000);
+      }
+      return;
     }
+    window.postMessage(
+      { type: "wrh-rea-listings", listings },
+      window.location.origin
+    );
   }
 
   const API_URL_RE = /lexa|graphql|listing|map|search/i;
@@ -238,6 +254,12 @@
     if (event.source !== window || !event.data || typeof event.data !== "object") return;
     if (event.data.type === "wrh-rules" && event.data.rules) {
       rules = event.data.rules;
+      if (!contentReady) {
+        contentReady = true;
+        if (pendingHarvest.length) {
+          sendHarvest(pendingHarvest.splice(0, pendingHarvest.length));
+        }
+      }
       scan();
     } else if (event.data.type === "wrh-deep-ids" && Array.isArray(event.data.ids)) {
       flaggedIds = new Set(event.data.ids.map(String));
