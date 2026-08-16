@@ -39,12 +39,19 @@ Layered detection, because the listings keep getting sneakier:
 Everything runs locally. No accounts, no analytics, no data leaves the
 browser. See [store/PRIVACY.md](store/PRIVACY.md).
 
-## Install (unpacked)
+## Install
 
-1. `chrome://extensions` → enable **Developer mode**
-2. **Load unpacked** → select the [`extension/`](extension/) folder
+**Easiest** (until the Chrome Web Store listing is live): download the ZIP
+from the [latest release](https://github.com/geekrebel/re-poo/releases/latest),
+unzip it, then:
+
+1. `chrome://extensions` → enable **Developer mode** (top right)
+2. **Load unpacked** → select the unzipped folder
 3. Browse a [domain.com.au](https://www.domain.com.au) search and watch the
    pill count climb
+
+**From a clone:** same steps, but Load unpacked the [`extension/`](extension/)
+folder. Sideloaded installs don't auto-update — re-download for new versions.
 
 ## Repo layout
 
