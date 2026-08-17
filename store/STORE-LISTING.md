@@ -16,36 +16,57 @@ Upload: `re-poo-v2.1.0.zip` (in this folder).
 **Name:** RE-Poo — Real Estate Search Helper
 
 **Summary (short description):**
-Fixes real estate search results: hide Retirement Living and other unwanted
-listings, show monthly prices next to weekly rents.
+Catches retirement villages & land-lease parks disguised as Houses on Domain and realestate.com.au — hides them and 💩s their pins.
 
 **Detailed description:**
 
-Tired of "House" search results that turn out to be retirement villages?
+Half the "houses" in some Australian property searches aren't houses.
 
-Australian property sites let land-lease communities, over-55s villages and
-retirement estates appear in ordinary House searches — often with nothing on
-the card to warn you. Real Estate Search Helper cleans up your search:
+They're retirement villages, over-55s communities and land-lease parks —
+listed as "House" or "Villa" with nothing on the card to warn you. RE-Poo
+finds them, hides them, and marks their map pins with the emoji they
+deserve. 💩
 
-• Hides Retirement Living listings automatically, including ones "disguised"
-  as ordinary houses or villas.
-• Reads listing descriptions to catch land-lease and over-55s communities
-  that avoid the word "retirement" entirely.
-• Learns village locations: once one listing in a park is identified, every
-  other listing at that address — or within its grounds — is filtered too.
-• Marks excluded listings on the search map with a red pin (or a 💩 emoji —
-  your choice).
-• Shows a counter of hidden listings; click it to peek at what was filtered
-  so you never miss a genuine home.
-• Add your own exclusion keywords (e.g. a local village brand name).
-• Bonus: shows the approximate monthly cost next to weekly rents
-  ("$900 per week (≈ $3,900/mo)").
+Born from a Central Coast house hunt where 20 of 44 "House" results under
+$800k turned out to be villages you can't buy into unless you're over 50.
 
-Everything runs locally in your browser. No accounts, no tracking, no data
-leaves your machine.
+HOW IT CATCHES THEM
+Layered detection, because these listings keep getting sneakier:
+• Reads the portals' own listing data, including flags that never appear on
+  the card
+• Scans listing descriptions for tells like "over-55s", "land lease" and
+  "lifestyle village" — slowly, politely, and cached so each listing is only
+  ever checked once
+• Remembers village addresses and locations: once one listing in a park
+  slips up, every future listing at that address is caught automatically,
+  on both sites. A village only has to slip up once, ever.
 
-Currently tuned for domain.com.au; realestate.com.au has basic support
-(keyword-based hiding and rent conversion).
+WHAT YOU SEE
+• Village listings vanish from domain.com.au search results
+• Their map pins turn blood red or 💩 (your choice) on domain.com.au AND
+  realestate.com.au — bundled pins keep their count, so 💩33 means a
+  33-listing park at one address
+• A green counter shows how many listings were hidden — click it to peek at
+  them, dimmed and outlined, so nothing genuine is ever silently lost
+• Add your own exclusion keywords for anything else you never want to see
+• Bonus: weekly rents get a monthly equivalent — "$900 per week (≈ $3,900/mo)"
+
+PRIVATE BY DESIGN
+Everything runs locally in your browser. No accounts, no analytics, no data
+collection — the only network requests go to the real-estate site you're
+already browsing.
+
+OPEN SOURCE
+MIT-licensed at github.com/geekrebel/re-poo. Found a village that slipped
+through? Open a "Village report" issue on GitHub — that's how the detection
+gets smarter.
+
+GOOD TO KNOW
+• Detection is deepest on domain.com.au; on realestate.com.au the map view
+  is the fully supported surface, and a brand-new area may need one pan or
+  zoom before pins mark
+• Heuristics can occasionally flag a genuine gated estate — the peek counter
+  lets you audit everything that was hidden
 
 **Category:** Shopping (alternative: Productivity → Tools)
 
