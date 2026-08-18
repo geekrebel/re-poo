@@ -100,6 +100,7 @@
       lastListingsMap =
         data?.props?.pageProps?.componentProps?.listingsMap || {};
       for (const [id, entry] of Object.entries(lastListingsMap)) {
+        if (exceptionIds.has(String(id))) continue;
         if (entry && listingModelFlagged(entry.listingModel)) {
           dataFlaggedIds.add(String(id));
         }
@@ -114,12 +115,24 @@
       ...dataFlaggedIds,
       ...markerFlaggedIds,
       ...deepFlaggedIds,
-      ...clusterFlaggedIds
+      ...clusterFlaggedIds,
+      ...userVillageIds
     ]) {
+      if (exceptionIds.has(String(id))) continue;
       for (const el of document.querySelectorAll(
         `li[data-testid="listing-${id}"]`
       )) {
         el.classList.add(HIDDEN_CLASS);
+      }
+    }
+    for (const key of personalHides.keys()) {
+      if (!key.startsWith(SITE + ":")) continue;
+      const id = key.slice(SITE.length + 1);
+      for (const el of document.querySelectorAll(
+        `li[data-testid="listing-${id}"]`
+      )) {
+        el.classList.add(HIDDEN_CLASS);
+        el.classList.add("wrh-hidden-user");
       }
     }
   }
@@ -204,6 +217,7 @@
     deepFlaggedIds = new Set();
     if (!settings.deepScan) return;
     for (const id of deepCache.keys()) {
+      if (exceptionIds.has(String(id))) continue;
       if (deepEvaluate(id)) deepFlaggedIds.add(String(id));
     }
   }
@@ -291,9 +305,13 @@
       return;
     }
     chrome.storage.local.get({ villageBases: [], villagePts: [] }, (res) => {
-      savedBases = new Set(res.villageBases || []);
+      savedBases = new Set((res.villageBases || []).filter((b) => !exceptionBases.has(b)));
       savedPts = (res.villagePts || []).filter(
-        (p) => Array.isArray(p) && typeof p[0] === "number" && typeof p[1] === "number"
+        (p) =>
+          Array.isArray(p) &&
+          typeof p[0] === "number" &&
+          typeof p[1] === "number" &&
+          !nearExceptionPt(p)
       );
       for (const p of savedPts) savedPtKeys.add(ptKey(p));
       done();
@@ -308,45 +326,236 @@
       if (!extAlive()) return;
       // Merge with storage rather than overwrite: tabs on both sites write
       // concurrently, and last-writer-wins was observed wiping villages that
-      // other tabs had learned.
+      // other tabs had learned. User "not a village" corrections are removed
+      // from both memory and the written union so they cannot resurrect.
       chrome.storage.local.get({ villageBases: [], villagePts: [] }, (res) => {
-        for (const b of res.villageBases || []) savedBases.add(b);
+        for (const b of res.villageBases || []) {
+          if (!exceptionBases.has(b)) savedBases.add(b);
+        }
         for (const p of res.villagePts || []) {
           if (
             Array.isArray(p) &&
             typeof p[0] === "number" &&
             typeof p[1] === "number" &&
-            !savedPtKeys.has(ptKey(p))
+            !savedPtKeys.has(ptKey(p)) &&
+            !nearExceptionPt(p)
           ) {
             savedPtKeys.add(ptKey(p));
             savedPts.push(p);
           }
         }
         chrome.storage.local.set({
-          villageBases: [...savedBases].slice(-800),
-          villagePts: savedPts.slice(-3000)
+          villageBases: [...savedBases].filter((b) => !exceptionBases.has(b)).slice(-800),
+          villagePts: savedPts.filter((p) => !nearExceptionPt(p)).slice(-3000)
         });
       });
     }, 1000);
+  }
+
+  // ---------- user actions: personal hides, village marks, corrections ----------
+  // 🚫 "not for me": hides one listing, teaches nothing. Stored per-site by
+  // listing id, with coordinates kept ONLY so the other site can display 🚫
+  // on the matching pin — never fed to clustering.
+  // 💩 "retirement village": strong evidence, same as a deep-scan hit.
+  // "not a retirement village": correction — un-flags the listing and
+  // un-teaches its address/coordinates from the registry, permanently.
+
+  const SITE = location.host.includes("realestate") ? "rea" : "domain";
+  const personalHides = new Map(); // "<site>:<id>" -> {lat, lng, t}
+  const userVillageIds = new Set(); // this site's user-marked village listing ids
+  const exceptionIds = new Set();
+  const exceptionBases = new Set();
+  let exceptionPts = []; // [lat, lng] of corrected listings
+
+  function nearExceptionPt(p) {
+    if (!Array.isArray(p) || typeof p[0] !== "number") return false;
+    for (const e of exceptionPts) {
+      const cosLat = Math.cos((e[0] * Math.PI) / 180);
+      const dx = (p[1] - e[1]) * 111320 * cosLat;
+      const dy = (p[0] - e[0]) * 110574;
+      if (dx * dx + dy * dy <= 50 * 50) return true;
+    }
+    return false;
+  }
+
+  function loadUserData(done) {
+    if (!hasLocalStorageArea) {
+      done();
+      return;
+    }
+    chrome.storage.local.get(
+      { personalHides: {}, userVillages: {}, exceptionIds: [], exceptionBases: [], exceptionPts: [] },
+      (res) => {
+        for (const [k, v] of Object.entries(res.personalHides || {})) {
+          personalHides.set(k, v || {});
+        }
+        for (const k of Object.keys(res.userVillages || {})) {
+          if (String(k).startsWith(SITE + ":")) {
+            userVillageIds.add(String(k).slice(SITE.length + 1));
+          }
+        }
+        for (const i of res.exceptionIds || []) exceptionIds.add(String(i));
+        for (const b of res.exceptionBases || []) exceptionBases.add(b);
+        exceptionPts = (res.exceptionPts || []).filter(
+          (p) => Array.isArray(p) && typeof p[0] === "number" && typeof p[1] === "number"
+        );
+        done();
+      }
+    );
+  }
+
+  let userTimer = null;
+  function persistUserData() {
+    if (!hasLocalStorageArea) return;
+    clearTimeout(userTimer);
+    userTimer = setTimeout(() => {
+      if (!extAlive()) return;
+      chrome.storage.local.get(
+        { personalHides: {}, userVillages: {}, exceptionIds: [], exceptionBases: [], exceptionPts: [] },
+        (res) => {
+          const ph = res.personalHides || {};
+          for (const k of Object.keys(ph)) {
+            if (k.startsWith(SITE + ":") && !personalHides.has(k)) delete ph[k];
+          }
+          for (const [k, v] of personalHides) ph[k] = v;
+          const uv = res.userVillages || {};
+          for (const k of Object.keys(uv)) {
+            if (k.startsWith(SITE + ":") && !userVillageIds.has(k.slice(SITE.length + 1))) delete uv[k];
+          }
+          for (const id of userVillageIds) {
+            uv[SITE + ":" + id] = uv[SITE + ":" + id] || { t: Date.now() };
+          }
+          const exI = new Set((res.exceptionIds || []).map(String));
+          for (const i of exceptionIds) exI.add(i);
+          const exB = new Set(res.exceptionBases || []);
+          for (const b of exceptionBases) exB.add(b);
+          const exP = (res.exceptionPts || []).filter(Array.isArray);
+          const seenP = new Set(exP.map((p) => p[0].toFixed(5) + "," + p[1].toFixed(5)));
+          for (const p of exceptionPts) {
+            const k = p[0].toFixed(5) + "," + p[1].toFixed(5);
+            if (!seenP.has(k)) {
+              seenP.add(k);
+              exP.push(p);
+            }
+          }
+          chrome.storage.local.set({
+            personalHides: ph,
+            userVillages: uv,
+            exceptionIds: [...exI].slice(-2000),
+            exceptionBases: [...exB].slice(-500),
+            exceptionPts: exP.slice(-500)
+          });
+        }
+      );
+    }, 500);
+  }
+
+  function broadcastPersonal() {
+    const ids = [];
+    const pts = [];
+    for (const [key, v] of personalHides) {
+      if (key.startsWith(SITE + ":")) ids.push(key.slice(SITE.length + 1));
+      if (v && typeof v.lat === "number" && typeof v.lng === "number") {
+        pts.push([v.lat, v.lng]);
+      }
+    }
+    window.postMessage(
+      { type: "wrh-personal", ids, pts },
+      window.location.origin
+    );
+  }
+
+  function refreshAfterUserAction() {
+    persistUserData();
+    recomputeDeepFlagged();
+    recomputeClusters();
+    unhideAll();
+    hidePass(document.body);
+    hideFlaggedIds();
+    updatePill();
+    broadcastRules();
+    broadcastDeepIds();
+    broadcastPersonal();
+  }
+
+  function handleUserAction(action, items) {
+    for (const item of items) {
+      if (!item || item.id == null) continue;
+      const id = String(item.id);
+      const key = SITE + ":" + id;
+      const hasGeo = typeof item.lat === "number" && typeof item.lng === "number";
+      if (action === "hide") {
+        personalHides.set(key, { lat: item.lat, lng: item.lng, t: Date.now() });
+      } else if (action === "restore") {
+        personalHides.delete(key);
+      } else if (action === "village") {
+        userVillageIds.add(id);
+        exceptionIds.delete(id);
+        if (hasGeo) {
+          const p = [item.lat, item.lng];
+          exceptionPts = exceptionPts.filter(
+            (e) => e[0].toFixed(5) + "," + e[1].toFixed(5) !== p[0].toFixed(5) + "," + p[1].toFixed(5)
+          );
+          if (!savedPtKeys.has(ptKey(p))) {
+            savedPtKeys.add(ptKey(p));
+            savedPts.push(p);
+          }
+        }
+        const model = lastListingsMap[id] && lastListingsMap[id].listingModel;
+        const info = model ? baseAddressKey(model) : null;
+        if (info) {
+          exceptionBases.delete(info.key);
+          savedBases.add(info.key);
+        }
+        persistRegistry();
+      } else if (action === "exception") {
+        exceptionIds.add(id);
+        userVillageIds.delete(id);
+        const model = lastListingsMap[id] && lastListingsMap[id].listingModel;
+        const info = model ? baseAddressKey(model) : null;
+        if (info) {
+          exceptionBases.add(info.key);
+          savedBases.delete(info.key);
+        }
+        if (hasGeo) {
+          exceptionPts.push([item.lat, item.lng]);
+          savedPts = savedPts.filter((p) => {
+            if (nearExceptionPt(p)) {
+              savedPtKeys.delete(ptKey(p));
+              return false;
+            }
+            return true;
+          });
+        }
+        persistRegistry();
+      }
+    }
+    refreshAfterUserAction();
   }
 
   function recomputeClusters() {
     clusterFlaggedIds = new Set();
     let registryChanged = false;
     // Strongly flagged listings feed the registry (never cluster-inherited
-    // ones — that would let one mistake snowball).
+    // ones — that would let one mistake snowball). User 💩 marks count as
+    // strong; "not a retirement village" corrections are excluded everywhere.
     for (const [id, entry] of Object.entries(lastListingsMap)) {
-      if (!(dataFlaggedIds.has(String(id)) || deepFlaggedIds.has(String(id)))) continue;
+      if (exceptionIds.has(String(id))) continue;
+      const strong =
+        dataFlaggedIds.has(String(id)) ||
+        deepFlaggedIds.has(String(id)) ||
+        userVillageIds.has(String(id));
+      if (!strong) continue;
       const model = entry?.listingModel;
       const info = baseAddressKey(model);
-      if (info && !savedBases.has(info.key)) {
+      if (info && !savedBases.has(info.key) && !exceptionBases.has(info.key)) {
         savedBases.add(info.key);
         registryChanged = true;
       }
       const addr = model?.address;
       if (addr && typeof addr.lat === "number" && typeof addr.lng === "number") {
         const p = [addr.lat, addr.lng];
-        if (!savedPtKeys.has(ptKey(p))) {
+        if (!savedPtKeys.has(ptKey(p)) && !nearExceptionPt(p)) {
           savedPtKeys.add(ptKey(p));
           savedPts.push(p);
           registryChanged = true;
@@ -355,10 +564,17 @@
     }
     if (registryChanged) persistRegistry();
     for (const [id, entry] of Object.entries(lastListingsMap)) {
-      if (dataFlaggedIds.has(String(id)) || deepFlaggedIds.has(String(id))) continue;
+      if (exceptionIds.has(String(id))) continue;
+      if (
+        dataFlaggedIds.has(String(id)) ||
+        deepFlaggedIds.has(String(id)) ||
+        userVillageIds.has(String(id))
+      ) {
+        continue;
+      }
       const model = entry?.listingModel;
       const info = baseAddressKey(model);
-      if (info && savedBases.has(info.key)) {
+      if (info && savedBases.has(info.key) && !exceptionBases.has(info.key)) {
         clusterFlaggedIds.add(String(id));
         continue;
       }
@@ -374,7 +590,12 @@
     window.postMessage(
       {
         type: "wrh-deep-ids",
-        ids: [...deepFlaggedIds, ...clusterFlaggedIds, ...reaFlaggedIds]
+        ids: [
+          ...deepFlaggedIds,
+          ...clusterFlaggedIds,
+          ...reaFlaggedIds,
+          ...userVillageIds
+        ].filter((i) => !exceptionIds.has(String(i)))
       },
       window.location.origin
     );
@@ -525,6 +746,7 @@
   function unhideAll() {
     for (const el of document.querySelectorAll("." + HIDDEN_CLASS)) {
       el.classList.remove(HIDDEN_CLASS);
+      el.classList.remove("wrh-hidden-user");
     }
   }
 
@@ -611,6 +833,21 @@
         padding: 8px 14px; border-radius: 999px; cursor: pointer;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); user-select: none;
       }
+      .wrh-card-btns {
+        position: absolute; top: 8px; right: 8px; z-index: 10;
+        display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s;
+      }
+      li[data-wrh-btns]:hover .wrh-card-btns { opacity: 1; }
+      .wrh-card-btn {
+        border: 1px solid rgba(0, 0, 0, 0.25); background: #fff;
+        border-radius: 6px; font-size: 14px; line-height: 1.4;
+        padding: 2px 7px; cursor: pointer;
+      }
+      .wrh-card-btn:hover { background: #eee; }
+      .wrh-card-restore { display: none; font-size: 12px; }
+      html.wrh-reveal .wrh-hidden-user .wrh-card-btns { opacity: 1; }
+      html.wrh-reveal .wrh-hidden-user .wrh-card-btn { display: none; }
+      html.wrh-reveal .wrh-hidden-user .wrh-card-restore { display: inline-block; }
     `;
     document.head.appendChild(style);
   }
@@ -632,8 +869,52 @@
       );
       document.body.appendChild(pill);
     }
-    const label = `${count} listing${count === 1 ? "" : "s"} hidden — click to peek`;
+    const byYou = document.querySelectorAll(".wrh-hidden-user").length;
+    const label = `${count} listing${count === 1 ? "" : "s"} hidden${
+      byYou ? ` (${byYou} by you)` : ""
+    } — click to peek`;
     if (pill.textContent !== label) pill.textContent = label;
+  }
+
+  // ---------- per-card hide buttons (Domain list view) ----------
+
+  function ensureCardButtons(root) {
+    if (SITE !== "domain") return;
+    const scope = root && root.querySelectorAll ? root : document.body;
+    for (const li of scope.querySelectorAll(
+      'li[data-testid^="listing-"]:not([data-wrh-btns])'
+    )) {
+      const id = (li.getAttribute("data-testid") || "").replace("listing-", "");
+      if (!/^\d+$/.test(id)) continue;
+      li.setAttribute("data-wrh-btns", "1");
+      const wrap = document.createElement("div");
+      wrap.className = "wrh-card-btns";
+      const mk = (label, title, action, cls) => {
+        const b = document.createElement("button");
+        b.className = cls || "wrh-card-btn";
+        b.textContent = label;
+        b.title = title;
+        b.addEventListener("click", (e) => {
+          // Cards are wrapped in links — swallow the click.
+          e.preventDefault();
+          e.stopPropagation();
+          const addr =
+            (lastListingsMap[id] && lastListingsMap[id].listingModel?.address) || {};
+          handleUserAction(action, [{ id, lat: addr.lat, lng: addr.lng }]);
+        });
+        return b;
+      };
+      wrap.appendChild(mk("\u{1F6AB}", "Not for me — hide this listing", "hide"));
+      wrap.appendChild(
+        mk("\u{1F4A9}", "Retirement village — hide this address everywhere", "village")
+      );
+      wrap.appendChild(
+        mk("↩ restore", "Restore this listing", "restore", "wrh-card-btn wrh-card-restore")
+      );
+      const style = window.getComputedStyle(li);
+      if (style.position === "static") li.style.position = "relative";
+      li.appendChild(wrap);
+    }
   }
 
   // ---------- bridge to map-agent.js (MAIN world) ----------
@@ -649,7 +930,9 @@
           keywords: cleanKeywords(),
           // Registry coordinates let the REA agent mark pins purely by
           // proximity to villages learned on Domain (and vice versa).
-          pts: savedPts.slice(-500)
+          pts: savedPts.slice(-500),
+          // "Not a retirement village" corrections — agents must not flag these.
+          exceptIds: [...exceptionIds].slice(-500)
         }
       },
       window.location.origin
@@ -661,6 +944,13 @@
     if (event.data.type === "wrh-get-rules") {
       broadcastRules();
       broadcastDeepIds();
+      broadcastPersonal();
+    } else if (
+      event.data.type === "wrh-user-action" &&
+      typeof event.data.action === "string" &&
+      Array.isArray(event.data.items)
+    ) {
+      handleUserAction(event.data.action, event.data.items);
     } else if (event.data.type === "wrh-flagged-ids" && Array.isArray(event.data.ids)) {
       for (const id of event.data.ids) markerFlaggedIds.add(String(id));
       hideFlaggedIds();
@@ -767,9 +1057,11 @@
     } else {
       deannotatePass(document.body);
     }
+    ensureCardButtons(document.body);
     updatePill();
     broadcastRules();
     broadcastDeepIds();
+    broadcastPersonal();
     queueDeepScans();
   }
 
@@ -794,6 +1086,7 @@
           } else if (node.nodeType === Node.ELEMENT_NODE) {
             hidePass(node);
             if (settings.showMonthly) annotatePass(node);
+            ensureCardButtons(node);
           }
         }
       }
@@ -804,12 +1097,15 @@
 
   function start() {
     loadDeepCache(() => {
-      loadRegistry(() => {
-        applyAll();
-        observer.observe(document.body, {
-          childList: true,
-          characterData: true,
-          subtree: true
+      loadUserData(() => {
+        // Exceptions must load before the registry so its filters apply.
+        loadRegistry(() => {
+          applyAll();
+          observer.observe(document.body, {
+            childList: true,
+            characterData: true,
+            subtree: true
+          });
         });
       });
     });
@@ -831,7 +1127,8 @@
               Array.isArray(p) &&
               typeof p[0] === "number" &&
               typeof p[1] === "number" &&
-              !savedPtKeys.has(ptKey(p))
+              !savedPtKeys.has(ptKey(p)) &&
+              !nearExceptionPt(p)
             ) {
               savedPtKeys.add(ptKey(p));
               savedPts.push(p);
@@ -841,7 +1138,7 @@
         }
         if (changes.villageBases) {
           for (const b of changes.villageBases.newValue || []) {
-            if (!savedBases.has(b)) {
+            if (!savedBases.has(b) && !exceptionBases.has(b)) {
               savedBases.add(b);
               touched = true;
             }

@@ -7,7 +7,7 @@ Everything below is copy-paste ready for the Developer Dashboard
 
 ## Package
 
-Upload: `re-poo-v2.1.0.zip` (in this folder).
+Upload: `re-poo-v2.2.0.zip` (in this folder).
 
 ---
 
@@ -50,6 +50,16 @@ WHAT YOU SEE
   them, dimmed and outlined, so nothing genuine is ever silently lost
 • Add your own exclusion keywords for anything else you never want to see
 • Bonus: weekly rents get a monthly equivalent — "$900 per week (≈ $3,900/mo)"
+
+YOU'RE IN CONTROL
+• Right-click any map pin (on either site) to act on it yourself:
+  🚫 Not for me — hides that one listing, marks its pin, teaches nothing
+  💩 Retirement village — hides it and remembers the address forever
+• Got it wrong? Right-click a 💩 pin and choose "Not a retirement village"
+  to restore it and un-teach the detection
+• On Domain, the same 🚫 and 💩 buttons appear when you hover a listing card
+• The hidden counter shows your own exclusions separately ("12 hidden, 3 by
+  you") and peek mode is where you restore anything you've hidden
 
 PRIVATE BY DESIGN
 Everything runs locally in your browser. No accounts, no analytics, no data
@@ -121,7 +131,7 @@ data is collected, but it removes reviewer friction.
 1. Go to https://chrome.google.com/webstore/devconsole and sign in with the
    Google account you want to own the extension.
 2. Pay the one-time US$5 developer registration fee.
-3. "New item" → upload `re-poo-v2.1.0.zip`.
+3. "New item" → upload `re-poo-v2.2.0.zip`.
 4. Fill the Store Listing tab (copy from above), upload icon/screenshots.
    The 128px icon inside the package is used automatically.
 5. Fill the Privacy tab (copy from above).

@@ -11,6 +11,19 @@
 (function () {
   let rules = null; // includes registry points (pts) from content.js
   let flaggedIds = new Set();
+  let personalIds = new Set(); // user's 🚫 hides (this site)
+  let personalPts = []; // 🚫 coordinates from either site (display-only)
+
+  function nearPersonalPt(lat, lng) {
+    if (typeof lat !== "number" || typeof lng !== "number") return false;
+    const cosLat = Math.cos((lat * Math.PI) / 180);
+    for (const p of personalPts) {
+      const dx = (p[1] - lng) * 111320 * cosLat;
+      const dy = (p[0] - lat) * 110574;
+      if (dx * dx + dy * dy <= 25 * 25) return true;
+    }
+    return false;
+  }
 
   // Wider than Domain's 175m: REA and Domain geocode the same park a couple
   // of hundred metres apart (observed: 236m for 33 Karalta Rd), so cross-site
@@ -60,21 +73,47 @@
         text-shadow: 0 1px 2px rgba(0,0,0,0.7);
       }
       button.wrh-rea-flagged span { color: #fff !important; }
+      button.wrh-rea-user > div { visibility: hidden; }
+      button.wrh-rea-user { position: relative; }
+      button.wrh-rea-user span.wrh-poop-pin {
+        position: absolute; inset: 0; display: flex;
+        align-items: center; justify-content: center;
+        font-size: 16px; visibility: visible; pointer-events: none;
+      }
+      #wrh-pin-menu {
+        position: fixed; z-index: 2147483647; background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.2); border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2); padding: 4px;
+        font: 13px/1.5 system-ui, sans-serif; min-width: 180px;
+      }
+      #wrh-pin-menu button {
+        display: block; width: 100%; text-align: left; border: none;
+        background: none; font: inherit; padding: 6px 10px;
+        border-radius: 5px; cursor: pointer; color: #222;
+      }
+      #wrh-pin-menu button:hover { background: #f0f0f0; }
+      #wrh-pin-menu .wrh-menu-title {
+        font-size: 11px; color: #888; padding: 4px 10px 2px;
+      }
     `;
     document.head.appendChild(style);
   }
 
-  function setMarkerStyle(btn, flagged) {
+  function setMarkerStyle(btn, flagged, personal) {
     const poop = rules.pinStyle === "poop";
-    btn.classList.toggle("wrh-rea-flagged", flagged && !poop);
-    btn.classList.toggle("wrh-rea-poop", flagged && poop);
+    const village = flagged;
+    const user = !flagged && personal;
+    btn.classList.toggle("wrh-rea-flagged", village && !poop);
+    btn.classList.toggle("wrh-rea-poop", village && poop);
+    btn.classList.toggle("wrh-rea-user", user);
     let s = btn.querySelector("span.wrh-poop-pin");
-    if (flagged && poop) {
+    if ((village && poop) || user) {
       // Cluster pins carry a bundled-listing count — keep it visible
       // ("💩33"), it's useful intel about how big the park is.
       const countEl = btn.querySelector("div span:not(.wrh-poop-pin)");
       const count = countEl ? countEl.textContent.trim() : "";
-      const label = count ? "\u{1F4A9}" + count : "\u{1F4A9}";
+      const emoji = user ? "\u{1F6AB}" : "\u{1F4A9}";
+      const label = count ? emoji + count : emoji;
       if (!s) {
         s = document.createElement("span");
         s.className = "wrh-poop-pin";
@@ -102,9 +141,93 @@
       const lng = parseFloat(m[2]);
       const id = m[3];
       const flagged = flaggedIds.has(id) || nearRegistry(lat, lng);
-      setMarkerStyle(btn, !!rules.colorMapPins && flagged);
+      const personal = personalIds.has(id) || nearPersonalPt(lat, lng);
+      setMarkerStyle(btn, !!rules.colorMapPins && flagged, personal);
     }
   }
+
+  // ---------- right-click menu on pins ----------
+
+  function closeMenu() {
+    const m = document.getElementById("wrh-pin-menu");
+    if (m) m.remove();
+  }
+
+  function sendAction(action, items) {
+    window.postMessage(
+      { type: "wrh-user-action", action, items },
+      window.location.origin
+    );
+  }
+
+  function openMenu(x, y, btn) {
+    closeMenu();
+    const m = btn.id.match(MARKER_ID_RE);
+    if (!m) return;
+    const payload = [{ id: m[3], lat: parseFloat(m[1]), lng: parseFloat(m[2]) }];
+    const countEl = btn.querySelector("div span:not(.wrh-poop-pin)");
+    const count = countEl ? parseInt(countEl.textContent, 10) : 0;
+    const isVillage =
+      btn.classList.contains("wrh-rea-flagged") ||
+      btn.classList.contains("wrh-rea-poop");
+    const isPersonal = btn.classList.contains("wrh-rea-user");
+    const items = [];
+    if (isVillage) {
+      items.push(["Not a retirement village — restore", "exception"]);
+    } else if (isPersonal) {
+      items.push(["↩ Restore listing", "restore"]);
+    } else if (count > 1) {
+      items.push(["💩 Retirement village (" + count + " here)", "village"]);
+      items.push(["🚫 Hide these " + count, "hide"]);
+    } else {
+      items.push(["🚫 Not for me", "hide"]);
+      items.push(["💩 Retirement village", "village"]);
+    }
+    const menu = document.createElement("div");
+    menu.id = "wrh-pin-menu";
+    const title = document.createElement("div");
+    title.className = "wrh-menu-title";
+    title.textContent = "RE-Poo";
+    menu.appendChild(title);
+    for (const [label, action] of items) {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        sendAction(action, payload);
+        closeMenu();
+      });
+      menu.appendChild(b);
+    }
+    document.body.appendChild(menu);
+    const r = menu.getBoundingClientRect();
+    menu.style.left = Math.min(x, window.innerWidth - r.width - 8) + "px";
+    menu.style.top = Math.min(y, window.innerHeight - r.height - 8) + "px";
+  }
+
+  document.addEventListener(
+    "contextmenu",
+    (e) => {
+      if (!rules) return;
+      const btn = e.target && e.target.closest
+        ? e.target.closest('button[id^="BuyMapIndividual_"], button[id^="BuyMapCluster_"]')
+        : null;
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openMenu(e.clientX, e.clientY, btn);
+    },
+    true
+  );
+  document.addEventListener("mousedown", (e) => {
+    const m = document.getElementById("wrh-pin-menu");
+    if (m && !m.contains(e.target)) closeMenu();
+  }, true);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeMenu();
+  }, true);
+  window.addEventListener("scroll", closeMenu, true);
 
   // ---------- API response observation ----------
   // The map page has no embedded listing data; it arrives via client fetches.
@@ -326,6 +449,12 @@
     } else if (event.data.type === "wrh-deep-ids" && Array.isArray(event.data.ids)) {
       flaggedIds = new Set(event.data.ids.map(String));
       dbg.flaggedIdCount = flaggedIds.size;
+      scan();
+    } else if (event.data.type === "wrh-personal") {
+      personalIds = new Set((event.data.ids || []).map(String));
+      personalPts = (event.data.pts || []).filter(
+        (p) => Array.isArray(p) && typeof p[0] === "number" && typeof p[1] === "number"
+      );
       scan();
     }
   });
