@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "RE-Poo",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Fixes real estate search results: hide Retirement Living and other unwanted listings, show monthly prices next to weekly rents.",
   "permissions": [
     "storage"
@@ -50,5 +50,14 @@
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["villages.json"],
+      "matches": [
+        "https://www.domain.com.au/*",
+        "https://www.realestate.com.au/*"
+      ]
+    }
+  ]
 }

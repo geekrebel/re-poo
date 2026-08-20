@@ -45,6 +45,33 @@ els.showMonthly.addEventListener("change", () => {
   chrome.storage.sync.set({ showMonthly: els.showMonthly.checked });
 });
 
+// Copies the learned registry as JSON shaped for a villages.json PR/issue.
+const exportBtn = document.getElementById("exportVillages");
+exportBtn.addEventListener("click", () => {
+  chrome.storage.local.get({ villageBases: [], villagePts: [] }, (res) => {
+    const out = JSON.stringify(
+      {
+        note: "Learned by my RE-Poo install — bases are 'street|suburb' keys, points are [lat, lng]. Paste into a GitHub issue or shape into villages.json entries.",
+        bases: res.villageBases || [],
+        points: res.villagePts || []
+      },
+      null,
+      2
+    );
+    navigator.clipboard.writeText(out).then(
+      () => {
+        exportBtn.textContent = "Copied to clipboard";
+        setTimeout(() => {
+          exportBtn.textContent = "Export learned villages (for a GitHub contribution)";
+        }, 2000);
+      },
+      () => {
+        exportBtn.textContent = "Copy failed — see console";
+      }
+    );
+  });
+});
+
 // Debounced so typing doesn't hit storage.sync write quotas.
 let keywordTimer;
 els.extraKeywords.addEventListener("input", () => {

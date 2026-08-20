@@ -1,0 +1,94 @@
+{
+  "$comment": "Community index of Australian retirement / land-lease villages whose listings appear in general property searches. 'bases' are shared street addresses (units listed as X/BASE); 'streets' are the park's own internal street names (standalone-looking addresses); 'points' are [lat, lng] anywhere inside the park. Every field is optional but each entry needs at least one of bases/streets/points. A user's in-extension 'Not a retirement village' correction always overrides this list locally. To add a village: copy an entry, fill in what you know, open a PR.",
+  "villages": [
+    {
+      "name": "GreenLife Erina",
+      "suburb": "Erina",
+      "state": "NSW",
+      "postcode": "2250",
+      "bases": ["33 Karalta Road"],
+      "points": [
+        [-33.440563, 151.38683],
+        [-33.441124, 151.3862],
+        [-33.44136, 151.38638],
+        [-33.439365, 151.387022]
+      ]
+    },
+    {
+      "name": "Pine Needles Village",
+      "suburb": "Erina",
+      "state": "NSW",
+      "postcode": "2250",
+      "bases": ["61 Karalta Road"],
+      "points": [
+        [-33.44451, 151.38887],
+        [-33.44676, 151.38841],
+        [-33.443375, 151.38857],
+        [-33.443584, 151.38828],
+        [-33.441018, 151.389315]
+      ]
+    },
+    {
+      "name": "Tarragal Glen",
+      "suburb": "Erina",
+      "state": "NSW",
+      "postcode": "2250",
+      "bases": ["6 Tarragal Glen Avenue"],
+      "streets": ["Tarragal Glen Avenue"],
+      "points": [
+        [-33.436067, 151.399871],
+        [-33.439338, 151.397597]
+      ]
+    },
+    {
+      "name": "Broadlands Green Point",
+      "suburb": "Green Point",
+      "state": "NSW",
+      "postcode": "2251",
+      "bases": ["9 Milpera Road"],
+      "streets": ["First Avenue", "Second Avenue", "Third Avenue", "Frangipani Avenue"]
+    },
+    {
+      "name": "Broadlands Garden Estate",
+      "suburb": "Green Point",
+      "state": "NSW",
+      "postcode": "2251",
+      "bases": ["67 Koolang Road"]
+    },
+    {
+      "name": "Kincumber Nautical Village",
+      "suburb": "Kincumber",
+      "state": "NSW",
+      "postcode": "2251",
+      "streets": ["Thomas Gilbert Place"],
+      "points": [[-33.478159, 151.383135]]
+    },
+    {
+      "name": "Duffys Road Village (12-30 Duffys Rd)",
+      "suburb": "Terrigal",
+      "state": "NSW",
+      "postcode": "2260",
+      "bases": ["12 Duffys Road", "12-30 Duffys Road"],
+      "points": [
+        [-33.441658, 151.42255],
+        [-33.44152, 151.42253],
+        [-33.440659, 151.422913]
+      ]
+    },
+    {
+      "name": "474 Terrigal Drive Village",
+      "suburb": "Terrigal",
+      "state": "NSW",
+      "postcode": "2260",
+      "bases": ["474 Terrigal Drive"],
+      "points": [[-33.439785, 151.413029]]
+    },
+    {
+      "name": "Arthur Phillip Drive Village (Kincumber South)",
+      "suburb": "Kincumber South",
+      "state": "NSW",
+      "postcode": "2251",
+      "streets": ["Arthur Phillip Drive"]
+    }
+  ]
+}

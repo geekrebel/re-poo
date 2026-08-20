@@ -450,6 +450,57 @@
     }, 500);
   }
 
+  // ---------- bundled community village index ----------
+  // villages.json ships with the extension: villages known to the project
+  // regardless of what's currently listed (the learned registry can only
+  // re-learn villages that still have flagged listings on the market).
+  // User corrections override seeds via the same exception filters.
+
+  let seedBases = new Set();
+  let seedPts = [];
+
+  function loadSeedVillages(done) {
+    let url = null;
+    try {
+      url =
+        typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL
+          ? chrome.runtime.getURL("villages.json")
+          : null;
+    } catch (e) {}
+    if (!url) {
+      done();
+      return;
+    }
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        for (const v of (data && data.villages) || []) {
+          const suburb = String(v.suburb || "").trim().toLowerCase();
+          for (const b of [...(v.bases || []), ...(v.streets || [])]) {
+            const key =
+              String(b).trim().toLowerCase().replace(/\s+/g, " ") + "|" + suburb;
+            seedBases.add(key);
+          }
+          for (const p of v.points || []) {
+            if (Array.isArray(p) && typeof p[0] === "number" && typeof p[1] === "number") {
+              seedPts.push(p);
+            }
+          }
+        }
+        done();
+      })
+      .catch(() => done());
+  }
+
+  function knownBase(key) {
+    if (!key || exceptionBases.has(key)) return false;
+    return savedBases.has(key) || seedBases.has(key);
+  }
+
+  function allVillagePts() {
+    return [...savedPts, ...seedPts.filter((p) => !nearExceptionPt(p))];
+  }
+
   function broadcastPersonal() {
     const ids = [];
     const pts = [];
@@ -574,11 +625,12 @@
       }
       const model = entry?.listingModel;
       const info = baseAddressKey(model);
-      if (info && savedBases.has(info.key) && !exceptionBases.has(info.key)) {
+      if (info && knownBase(info.key)) {
         clusterFlaggedIds.add(String(id));
         continue;
       }
-      if (savedPts.length >= GEO_MIN_VOTES && nearFlaggedPoints(model?.address, savedPts)) {
+      const pts = allVillagePts();
+      if (pts.length >= GEO_MIN_VOTES && nearFlaggedPoints(model?.address, pts)) {
         clusterFlaggedIds.add(String(id));
       }
     }
@@ -928,9 +980,9 @@
           pinStyle: settings.pinStyle,
           hideRetirement: settings.hideRetirement,
           keywords: cleanKeywords(),
-          // Registry coordinates let the REA agent mark pins purely by
-          // proximity to villages learned on Domain (and vice versa).
-          pts: savedPts.slice(-500),
+          // Registry + bundled-index coordinates let agents mark pins purely
+          // by proximity, independent of what's currently listed.
+          pts: allVillagePts().slice(-800),
           // "Not a retirement village" corrections — agents must not flag these.
           exceptIds: [...exceptionIds].slice(-500)
         }
@@ -1009,8 +1061,7 @@
         });
         const contentHit =
           (settings.hideRetirement && re.test(hay)) || kwHit;
-        const baseHit =
-          settings.hideRetirement && info && savedBases.has(info.key);
+        const baseHit = settings.hideRetirement && info && knownBase(info.key);
         if (!contentHit && !baseHit) continue;
         const id = String(item.id);
         if (!reaFlaggedIds.has(id)) {
@@ -1100,11 +1151,13 @@
       loadUserData(() => {
         // Exceptions must load before the registry so its filters apply.
         loadRegistry(() => {
-          applyAll();
-          observer.observe(document.body, {
-            childList: true,
-            characterData: true,
-            subtree: true
+          loadSeedVillages(() => {
+            applyAll();
+            observer.observe(document.body, {
+              childList: true,
+              characterData: true,
+              subtree: true
+            });
           });
         });
       });

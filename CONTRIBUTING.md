@@ -5,11 +5,18 @@ limited time, so this project is set up to run on autopilot: CI is the first
 reviewer, and issues that include the requested evidence get handled far
 faster than ones that don't.
 
-## The easiest contribution: report a sneaky listing
+## The easiest contribution: add a village to the index
 
-You don't need to write code. If a village listing escapes detection, open a
-**Village report** issue with the listing URL and what its card claims to be.
-These reports are how every detection layer in this extension got built.
+[`extension/villages.json`](extension/villages.json) is a community index of
+retirement / land-lease villages that pollute general property searches —
+name, suburb, shared base addresses, internal street names, coordinates.
+Bundled with the extension, it catches these parks even when no currently
+listed unit gives the game away. Adding a village is a one-entry PR; the
+schema is documented at the top of the file. Don't know all the fields?
+Open a **Village report** issue instead with the listing URL and whatever
+you know — or use the popup's "Export learned villages" button to dump what
+your own install has discovered. These reports are how every detection
+layer in this extension got built.
 
 ## Dev setup
 

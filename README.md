@@ -39,6 +39,10 @@ Layered detection, because the listings keep getting sneakier:
    inside the park, whatever its street is called.
 6. **Persistent village registry** — flagged addresses and coordinates are
    remembered across sessions. Each village only has to slip up once, ever.
+7. **Community village index** — [`extension/villages.json`](extension/villages.json)
+   ships known villages with the extension, so even parks with nothing
+   currently listed (or nothing honest) are caught from install day one.
+   Adding a village is a one-entry pull request.
 
 Everything runs locally. No accounts, no analytics, no data leaves the
 browser. See [store/PRIVACY.md](store/PRIVACY.md).
